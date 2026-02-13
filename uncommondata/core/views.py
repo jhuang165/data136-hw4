@@ -23,15 +23,15 @@ def index(request):
     context = {
         'current_time': get_current_time(),
         'team_members': [
-            {'name': 'John Doe', 'role': 'Lead Developer'},
-            {'name': 'Jane Smith', 'role': 'Frontend Specialist'},
-            {'name': 'Bob Johnson', 'role': 'Backend Engineer'},
+            {'name': 'Alex Chen', 'role': 'Lead Data Scientist'},
+            {'name': 'Maria Garcia', 'role': 'Frontend Developer'},
+            {'name': 'James Wilson', 'role': 'Backend Engineer'},
+            {'name': 'Sarah Johnson', 'role': 'UX Designer'},
         ]
     }
     
-    # If user is logged in, add to context for highlighting
-    if request.user.is_authenticated:
-        context['current_user'] = request.user
+    # The user is automatically available in templates via {{ user }}
+    # No need to add to context, but we can add extra user info if needed
     
     return render(request, 'uncommondata/index.html', context)
 
@@ -48,10 +48,6 @@ def create_user_api(request):
     """
     API endpoint to create a new user at /app/api/createUser/
     Requires POST with fields: email, user_name, password, is_curator
-    Returns:
-        - 201 Created on success
-        - 400 Bad Request if email exists or data invalid
-        - 405 Method Not Allowed for non-POST requests (handled by decorator)
     """
     # Extract data from POST request
     email = request.POST.get('email', '').strip()
@@ -67,7 +63,7 @@ def create_user_api(request):
     if User.objects.filter(email=email).exists():
         return HttpResponseBadRequest(f"email {email} already in use")
     
-    # Check if username already exists (optional but good practice)
+    # Check if username already exists
     if User.objects.filter(username=username).exists():
         return HttpResponseBadRequest(f"username {username} already taken")
     
@@ -75,8 +71,7 @@ def create_user_api(request):
         # Convert is_curator to boolean
         is_curator = bool(int(is_curator_str))
         
-        # Create the user using Django's built-in create_user method
-        # This handles password hashing automatically
+        # Create the user
         user = User.objects.create_user(
             username=username,
             email=email,
@@ -102,9 +97,3 @@ def create_user_api(request):
         return HttpResponseBadRequest("is_curator must be 0 or 1")
     except Exception as e:
         return HttpResponseBadRequest(f"Error creating user: {str(e)}")
-
-# Additional view for handling any method not allowed
-@require_http_methods(["GET", "POST"])
-def method_not_allowed(request):
-    """Return 405 for unsupported methods on endpoints that only accept specific methods"""
-    return HttpResponse(status=405)
