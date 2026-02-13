@@ -43,6 +43,9 @@ def new_user_form(request):
     """
     return render(request, 'uncommondata/new_user.html')
 
+def new_user_form_method_not_allowed(request):
+    return HttpResponseNotAllowed(['GET'])
+
 @require_http_methods(["POST"])
 def create_user_api(request):
     """

@@ -102,6 +102,15 @@
             background-color: #e3f2fd;
             border-radius: 8px;
         }
+        .not-logged-in {
+            font-size: 1.1em;
+            color: #666;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #fff3cd;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
     </style>
 </head>
 <body>
@@ -117,6 +126,7 @@
                     <button type="submit">Logout</button>
                 </form>
             {% else %}
+                <span>Not logged in</span>
                 <a href="{% url 'login' %}">Login</a>
                 <a href="{% url 'core:new_user_form' %}">Sign Up</a>
             {% endif %}
@@ -136,28 +146,38 @@
                 <p>You have <strong>harvester</strong> privileges.</p>
             {% endif %}
         </div>
+        {% else %}
+        <div class="not-logged-in">
+            <p><strong>Not logged in</strong> - Please login or create an account to access all features.</p>
+        </div>
         {% endif %}
         
         <h2>Our Team</h2>
         <div>
-            {% for member in team_members %}
-                <div class="team-member">
-                    <strong>{{ member.name }}</strong><br>
-                    <span style="color: #666;">{{ member.role }}</span>
-                </div>
-            {% endfor %}
+            <div class="team-member">
+                <strong>John Smith</strong><br>
+                <span style="color: #666;">Lead Developer</span>
+            </div>
+            <div class="team-member">
+                <strong>Jane Doe</strong><br>
+                <span style="color: #666;">Data Scientist</span>
+            </div>
+            <div class="team-member">
+                <strong>Bob Johnson</strong><br>
+                <span style="color: #666;">Frontend Expert</span>
+            </div>
         </div>
         
         <div class="bio-section">
             <h3>About Us</h3>
-            <p>We are a passionate team of developers working on data management solutions at Uncommon Data.</p>
-            <p>Our mission is to make data accessible, manageable, and secure for everyone.</p>
+            <p>We are a passionate team of developers working on data management solutions at Uncommon Data. Our mission is to make data accessible, manageable, and secure for everyone.</p>
             <p>With years of experience in data engineering and web development, we're building the future of data collaboration.</p>
             
             {% if not user.is_authenticated %}
-                <p style="margin-top: 20px;">
-                    <a href="{% url 'login' %}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Login to get started</a>
-                    <a href="{% url 'core:new_user_form' %}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-left: 10px;">Sign Up</a>
+                <p style="margin-top: 20px; text-align: center;">
+                    <strong>Not logged in?</strong> 
+                    <a href="{% url 'login' %}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 5px;">Login</a>
+                    <a href="{% url 'core:new_user_form' %}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 5px;">Sign Up</a>
                 </p>
             {% endif %}
         </div>

@@ -1,99 +1,180 @@
-{% extends 'uncommondata/base.html' %}
-
-{% block title %}Sign Up - Uncommon Data{% endblock %}
-
-{% block content %}
-<div class="container">
-    <h1>Create New User</h1>
-    
-    <form id="signupForm" style="max-width: 400px; margin: 0 auto; text-align: left;">
-        {% csrf_token %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign Up - Uncommon Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin: 10px 0 5px;
+            color: #555;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="password"] {
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .radio-group {
+            margin: 15px 0;
+        }
+        .radio-group label {
+            display: inline;
+            font-weight: normal;
+            margin: 0 20px 0 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .nav-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .nav-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .nav-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Create New User</h1>
         
-        <div style="margin-bottom: 15px;">
-            <label for="user_name" style="display: block; margin-bottom: 5px;">Username:</label>
-            <input type="text" id="user_name" name="user_name" required 
-                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-        </div>
-        
-        <div style="margin-bottom: 15px;">
-            <label for="email" style="display: block; margin-bottom: 5px;">Email Address:</label>
-            <input type="email" id="email" name="email" required 
-                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-        </div>
-        
-        <div style="margin-bottom: 15px;">
-            <label for="password" style="display: block; margin-bottom: 5px;">Password:</label>
-            <input type="password" id="password" name="password" required 
-                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-        </div>
-        
-        <div style="margin-bottom: 20px;">
-            <label style="display: block; margin-bottom: 5px;">User Type:</label>
-            <div>
+        <form id="signupForm" action="/app/api/createUser/" method="POST">
+            {% csrf_token %}
+            
+            <label for="user_name">User Name:</label>
+            <input type="text" id="user_name" name="user_name" required>
+            
+            <label for="email">Email Address:</label>
+            <input type="email" id="email" name="email" required>
+            
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            
+            <div class="radio-group">
+                <label>User Type:</label><br>
                 <input type="radio" id="harvester" name="is_curator" value="0" checked>
                 <label for="harvester">Harvester</label>
-            </div>
-            <div>
+                
                 <input type="radio" id="curator" name="is_curator" value="1">
                 <label for="curator">Curator</label>
             </div>
+            
+            <button type="submit">Sign Up</button>
+        </form>
+        
+        <div id="message" class="message"></div>
+        
+        <div class="nav-link">
+            <p>Already have an account? <a href="{% url 'login' %}">Login here</a></p>
         </div>
-        
-        <button type="submit" id="submitBtn" 
-                style="background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
-            Sign Up
-        </button>
-    </form>
-    
-    <div id="message" style="margin-top: 20px; padding: 10px; display: none;"></div>
-</div>
+    </div>
 
-<script>
-document.getElementById('signupForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    const messageDiv = document.getElementById('message');
-    const submitBtn = document.getElementById('submitBtn');
-    
-    // Disable button to prevent double submission
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Creating account...';
-    
-    fetch('/app/api/createUser/', {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-        }
-    })
-    .then(response => {
-        messageDiv.style.display = 'block';
+    <script>
+    document.getElementById('signupForm').addEventListener('submit', function(e) {
+        e.preventDefault();
         
-        if (response.status === 201) {
-            return response.text().then(text => {
-                messageDiv.innerHTML = '<div style="color: green; background-color: #d4edda; padding: 10px; border-radius: 4px;">✓ ' + text + '</div>';
-                // Redirect to home page after 2 seconds
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 2000);
-            });
-        } else if (response.status === 400) {
-            return response.text().then(text => {
-                messageDiv.innerHTML = '<div style="color: red; background-color: #f8d7da; padding: 10px; border-radius: 4px;">✗ ' + text + '</div>';
-            });
-        } else {
-            messageDiv.innerHTML = '<div style="color: red; background-color: #f8d7da; padding: 10px; border-radius: 4px;">✗ An error occurred. Please try again.</div>';
-        }
-    })
-    .catch(error => {
-        messageDiv.style.display = 'block';
-        messageDiv.innerHTML = '<div style="color: red; background-color: #f8d7da; padding: 10px; border-radius: 4px;">✗ Network error. Please try again.</div>';
-    })
-    .finally(() => {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Sign Up';
+        const formData = new FormData(this);
+        const messageDiv = document.getElementById('message');
+        const submitBtn = this.querySelector('button[type="submit"]');
+        
+        // Disable button to prevent double submission
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating account...';
+        
+        fetch('/app/api/createUser/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+        .then(response => {
+            messageDiv.style.display = 'block';
+            
+            if (response.status === 201) {
+                return response.text().then(text => {
+                    messageDiv.className = 'message success';
+                    messageDiv.innerHTML = '✓ ' + text + ' - Redirecting to home page...';
+                    // Redirect to home page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 2000);
+                });
+            } else if (response.status === 400) {
+                return response.text().then(text => {
+                    messageDiv.className = 'message error';
+                    messageDiv.innerHTML = '✗ ' + text;
+                });
+            } else {
+                messageDiv.className = 'message error';
+                messageDiv.innerHTML = '✗ An error occurred. Please try again.';
+            }
+        })
+        .catch(error => {
+            messageDiv.style.display = 'block';
+            messageDiv.className = 'message error';
+            messageDiv.innerHTML = '✗ Network error. Please try again.';
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Sign Up';
+        });
     });
-});
-</script>
-{% endblock %}
+    </script>
+</body>
+</html>
