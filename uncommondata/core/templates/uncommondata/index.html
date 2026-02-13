@@ -40,25 +40,13 @@
             min-width: 200px;
         }
         .time-display {
-            font-size: 2em;
-            color: #28a745;
-            margin: 30px 0;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            font-weight: bold;
-            border: 2px solid #28a745;
-        }
-        .time-label {
-            font-size: 0.6em;
-            color: #666;
-            display: block;
-            margin-bottom: 5px;
-        }
-        .time-value {
             font-size: 1.5em;
-            font-family: monospace;
-            letter-spacing: 2px;
+            color: #333;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            font-weight: bold;
         }
         .nav-links {
             margin: 20px 0;
@@ -145,8 +133,7 @@
         </div>
         
         <div class="time-display">
-            <span class="time-label">Current Time</span>
-            <span class="time-value">{{ current_time }}</span>
+            Time {{ current_time }}
         </div>
         
         {% if user.is_authenticated %}
