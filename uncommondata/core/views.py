@@ -9,29 +9,26 @@ import datetime
 from .models import UserProfile
 
 def get_current_time():
-    """Helper function to get current formatted time"""
-    return timezone.now().strftime("%B %d, %Y - %I:%M:%S %p")
+    """Helper function to get current formatted time - 24-hour format with hours and minutes"""
+    # Format: "HH:MM" in 24-hour format
+    return timezone.now().strftime("%H:%M")
 
 @require_GET
 def index(request):
     """
     Main index page that displays:
     - Team bio
-    - Current time
+    - Current time (in HH:MM format)
     - Highlights logged in user's name
     """
     context = {
         'current_time': get_current_time(),
         'team_members': [
-            {'name': 'Alex Chen', 'role': 'Lead Data Scientist'},
-            {'name': 'Maria Garcia', 'role': 'Frontend Developer'},
-            {'name': 'James Wilson', 'role': 'Backend Engineer'},
-            {'name': 'Sarah Johnson', 'role': 'UX Designer'},
+            {'name': 'John Smith', 'role': 'Lead Developer'},
+            {'name': 'Jane Doe', 'role': 'Data Scientist'},
+            {'name': 'Bob Johnson', 'role': 'Frontend Expert'},
         ]
     }
-    
-    # The user is automatically available in templates via {{ user }}
-    # No need to add to context, but we can add extra user info if needed
     
     return render(request, 'uncommondata/index.html', context)
 
@@ -42,9 +39,6 @@ def new_user_form(request):
     Only accepts GET requests, returns 405 for other methods
     """
     return render(request, 'uncommondata/new_user.html')
-
-def new_user_form_method_not_allowed(request):
-    return HttpResponseNotAllowed(['GET'])
 
 @require_http_methods(["POST"])
 def create_user_api(request):
