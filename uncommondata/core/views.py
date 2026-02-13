@@ -11,7 +11,8 @@ from .models import UserProfile
 def get_current_time():
     """Helper function to get current formatted time - 24-hour format with hours and minutes"""
     # Format: "HH:MM" in 24-hour format
-    return timezone.now().strftime("%H:%M")
+    chicago_time = timezone.localtime(timezone.now())
+    return chicago_time.strftime("%H:%M")
 
 @require_GET
 def index(request):
