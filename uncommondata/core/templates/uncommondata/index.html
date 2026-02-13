@@ -1,0 +1,40 @@
+{% extends 'uncommondata/base.html' %}
+
+{% block title %}Home - Uncommon Data{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Welcome to Uncommon Data</h1>
+    
+    <div class="time-display">
+        Current Time: {{ current_time }}
+    </div>
+    
+    <h2>Our Team</h2>
+    <div>
+        {% for member in team_members %}
+            <div class="team-member">
+                <strong>{{ member.name }}</strong><br>
+                {{ member.role }}
+            </div>
+        {% endfor %}
+    </div>
+    
+    <div style="margin-top: 30px; padding: 20px; background-color: #e9ecef; border-radius: 5px;">
+        <h3>About Us</h3>
+        <p>We are a passionate team of developers working on data management solutions.</p>
+        <p>Our mission is to make data accessible and manageable for everyone.</p>
+        
+        {% if user.is_authenticated %}
+            <p>You are logged in as <span class="highlight">{{ user.username }}</span>.</p>
+            {% if user.profile.is_curator %}
+                <p>You have <strong>curator</strong> privileges.</p>
+            {% else %}
+                <p>You have <strong>harvester</strong> privileges.</p>
+            {% endif %}
+        {% else %}
+            <p>You are not logged in. <a href="{% url 'login' %}">Login here</a> or <a href="{% url 'core:new_user_form' %}">create an account</a>.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
