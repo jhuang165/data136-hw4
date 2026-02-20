@@ -1,6 +1,5 @@
 from functools import wraps
 from django.http import JsonResponse
-from django.contrib.auth.models import User
 
 def api_login_required(view_func):
     """
