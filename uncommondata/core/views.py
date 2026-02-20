@@ -14,9 +14,7 @@ import time
 from datetime import datetime
 
 from .models import UserProfile, Upload
-
-# Import for LLM API calls
-import openai  # You'll need to install: pip install openai
+from .decorators import api_login_required, curator_required
 
 # Helper function for time
 def get_current_time():
@@ -86,14 +84,14 @@ def create_user_api(request):
     except Exception as e:
         return HttpResponseBadRequest(f"Error creating user: {str(e)}")
 
-# Uploads page view - redirects to login if not authenticated
+# Uploads page view - this is a page, so it should redirect to login
 @login_required(login_url='/accounts/login/')
 def uploads(request):
     """View for the uploads page"""
     return render(request, 'uncommondata/uploads.html')
 
-# Upload API endpoint
-@login_required(login_url='/accounts/login/')
+# Upload API endpoint - use api_login_required instead of login_required
+@api_login_required
 @require_http_methods(["POST"])
 def upload_api(request):
     """
@@ -130,8 +128,8 @@ def upload_api(request):
     except Exception as e:
         return HttpResponseBadRequest(f"Upload failed: {str(e)}")
 
-# Dump uploads API endpoint
-@login_required(login_url='/accounts/login/')
+# Dump uploads API endpoint - use api_login_required
+@api_login_required
 @require_GET
 def dump_uploads_api(request):
     """
@@ -166,19 +164,16 @@ def dump_uploads_api(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-# Dump data API endpoint (for curators only)
-@login_required(login_url='/accounts/login/')
+# Dump data API endpoint - use curator_required
+@curator_required
 @require_GET
 def dump_data_api(request):
     """
     Return data about uploads (for curators only)
     - 401 if not logged in (handled by decorator)
-    - 403 if logged in but not curator
+    - 403 if logged in but not curator (handled by decorator)
     - 200 if curator
     """
-    if not request.user.profile.is_curator:
-        return HttpResponseForbidden("Only curators can access this endpoint")
-    
     # For now, just return a simple message
     data = {
         'message': 'This endpoint is for curators only',
@@ -218,39 +213,14 @@ def get_llm_joke(topic):
         'lettuce': "Knock knock.\nWho's there?\nLettuce.\nLettuce who?\nLettuce in, it's cold out here!",
         'athena': "Knock knock.\nWho's there?\nAthena.\nAthena who?\nAthena my homework, can I copy yours?",
         'hw5': "Knock knock.\nWho's there?\nHW5.\nHW5 who?\nHW5 you doing with all these API endpoints?",
+        'python': "Knock knock.\nWho's there?\nPython.\nPython who?\nPython the door, it's cold out here!",
+        'django': "Knock knock.\nWho's there?\nDjango.\nDjango who?\nDjango unchained! Let me in!",
     }
     
     # Check if we have a canned joke for this topic
-    if topic.lower() in CANNED_JOKES:
-        return CANNED_JOKES[topic.lower()]
+    topic_lower = topic.lower()
+    if topic_lower in CANNED_JOKES:
+        return CANNED_JOKES[topic_lower]
     
-    # Try to get a joke from OpenAI if API key is available
-    api_key = os.environ.get('OPENAI_API_KEY')
-    if api_key:
-        try:
-            import openai
-            openai.api_key = api_key
-            
-            prompt = f"Create a knock-knock joke about '{topic}'. Format it as a proper knock-knock joke with 'Knock knock.' on the first line."
-            
-            # Set a timeout of 25 seconds (less than 30 to be safe)
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are a comedian that tells knock-knock jokes."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=100,
-                temperature=0.7,
-                timeout=25
-            )
-            
-            joke = response.choices[0].message.content.strip()
-            if joke:
-                return joke
-        except Exception as e:
-            # Fall back to canned joke on error
-            pass
-    
-    # Default canned joke
+    # Default canned joke for any topic
     return f"Knock knock.\nWho's there?\n{topic.capitalize()}.\n{topic.capitalize()} who?\n{topic.capitalize()} you please let me in? It's cold out here!"
