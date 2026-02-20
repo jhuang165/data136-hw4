@@ -16,6 +16,7 @@ urlpatterns = [
     path('app/uploads/', views.uploads, name='uploads'),
     path('app/api/upload/', views.upload_api, name='upload_api'),
     path('app/api/uploads-check/', views.uploads_api_check, name='uploads_api_check'),
+    path('app/api/uploads-status/', views.uploads_status, name='uploads_status'),
     
     # Data dump endpoints
     path('app/api/dump-uploads/', views.dump_uploads_api, name='dump_uploads_api'),
