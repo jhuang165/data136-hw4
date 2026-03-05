@@ -35,6 +35,28 @@ class Upload(models.Model):
             self.original_filename = os.path.basename(self.file.name)
         super().save(*args, **kwargs)
 
+
+class Fact(models.Model):
+    """Flexible storage for facts extracted from uploaded files."""
+
+    upload = models.ForeignKey(
+        Upload,
+        on_delete=models.CASCADE,
+        related_name='facts',
+        null=True,
+        blank=True,
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='facts',
+    )
+    data = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Fact {self.id} (upload={self.upload_id})"
+
 # Signals for UserProfile
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):

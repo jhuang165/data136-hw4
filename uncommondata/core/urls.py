@@ -15,6 +15,10 @@ urlpatterns = [
     # Uploads
     path('app/uploads/', views.uploads, name='uploads'),
     path('app/api/upload/', views.upload_api, name='upload_api'),
+    # HW6: unified uploads endpoint (GET index, POST create)
+    path('app/api/uploads/', views.uploads_api, name='uploads_api'),
+    # HW6: extract facts from an uploaded file
+    path('app/api/uploads/<int:upload_id>/extract/', views.extract_upload_to_facts_api, name='extract_upload_to_facts_api'),
     path('app/api/uploads-check/', views.uploads_api_check, name='uploads_api_check'),
     path('app/api/uploads-status/', views.uploads_status, name='uploads_status'),
     

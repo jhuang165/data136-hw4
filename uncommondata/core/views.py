@@ -13,7 +13,7 @@ import os
 import time
 from datetime import datetime
 
-from .models import UserProfile, Upload
+from .models import UserProfile, Upload, Fact
 from .decorators import api_login_required, curator_required
 
 # Helper function for time
@@ -308,3 +308,113 @@ def get_llm_joke(topic):
         return f"Knock knock.\nWho's there?\n{topic.capitalize()}.\n{topic.capitalize()} who?\n{topic.capitalize()} you please let me in? It's cold out here!"
     else:
         return "Knock knock.\nWho's there?\nWho.\nWho who?\nAre you an owl?"
+
+
+# -----------------------------
+# HW6: Upload index + extraction
+# -----------------------------
+
+def _user_can_access_upload(user, upload: Upload) -> bool:
+    """Curators can access all uploads; harvesters only their own."""
+    if not user.is_authenticated:
+        return False
+    if getattr(user, 'profile', None) and user.profile.is_curator:
+        return True
+    return upload.user_id == user.id
+
+
+def _extract_facts_from_file(path: str, original_filename: str) -> list[dict]:
+    """Best-effort extraction for common formats.
+
+    - CSV: one fact per row
+    - JSON: one fact per top-level item (list) or one fact (dict)
+    - TXT/other: one fact per non-empty line
+    """
+    import csv
+    import json as _json
+
+    ext = os.path.splitext(original_filename.lower())[1]
+    facts: list[dict] = []
+
+    if ext == '.csv':
+        with open(path, 'r', encoding='utf-8', errors='ignore', newline='') as f:
+            reader = csv.DictReader(f)
+            for i, row in enumerate(reader):
+                facts.append({"row": i, **row})
+        return facts
+
+    if ext == '.json':
+        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            data = _json.load(f)
+        if isinstance(data, list):
+            for i, item in enumerate(data):
+                facts.append({"index": i, "item": item})
+        else:
+            facts.append({"item": data})
+        return facts
+
+    # Default: treat as text
+    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+        for i, line in enumerate(f):
+            line = line.strip('\n')
+            if line.strip():
+                facts.append({"lineno": i + 1, "line": line})
+    return facts
+
+
+@api_login_required
+@require_http_methods(["GET", "POST"])
+def uploads_api(request):
+    """HW6 endpoint:
+    - POST: accept and save file uploads
+    - GET: provide an index of uploaded files
+
+    This is a stable API for the frontend feed.
+    """
+    if request.method == "POST":
+        return upload_api(request)  # reuse existing implementation
+
+    # GET: index uploads
+    if request.user.profile.is_curator:
+        uploads_qs = Upload.objects.all().select_related('user').order_by('-uploaded_at')
+    else:
+        uploads_qs = Upload.objects.filter(user=request.user).select_related('user').order_by('-uploaded_at')
+
+    data = []
+    for u in uploads_qs:
+        data.append({
+            "id": u.id,
+            "user": u.user.username,
+            "institution": u.institution,
+            "year": u.year,
+            "url": u.url,
+            "original_filename": u.original_filename,
+            "uploaded_at": u.uploaded_at.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+    return JsonResponse({"uploads": data}, status=200)
+
+
+@api_login_required
+@require_POST
+def extract_upload_to_facts_api(request, upload_id: int):
+    """HW6 endpoint: extract data from a specified uploaded file and store in Fact."""
+    try:
+        upload = Upload.objects.get(id=upload_id)
+    except Upload.DoesNotExist:
+        return JsonResponse({"error": "upload not found"}, status=404)
+
+    if not _user_can_access_upload(request.user, upload):
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    # Extract facts from file
+    file_path = upload.file.path
+    extracted = _extract_facts_from_file(file_path, upload.original_filename)
+
+    # Insert into DB
+    created = 0
+    Fact.objects.filter(upload=upload).delete()  # idempotent per upload
+    for fact in extracted:
+        Fact.objects.create(upload=upload, user=request.user, data=fact)
+        created += 1
+
+    return JsonResponse({"upload_id": upload.id, "inserted": created}, status=200)
