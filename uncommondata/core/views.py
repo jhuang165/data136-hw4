@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
-from .decorators import api_login_required, curator_required
+from .decorators import curator_required
 from .extraction import EXPECTED_FIELDS, extract_fields_from_file
 from .models import Upload
 
@@ -91,9 +91,11 @@ def uploads_status(request):
     return JsonResponse({"status": "ok"}, status=200)
 
 
-@api_login_required
 @require_http_methods(["POST"])
 def upload_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Authentication required"}, status=401)
+
     institution = request.POST.get("institution", "").strip()
     year = request.POST.get("year", "").strip()
     url = request.POST.get("url", "").strip() or None
@@ -140,6 +142,9 @@ def upload_api(request):
 
 @require_GET
 def dump_uploads_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Authentication required"}, status=401)
+
     uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
 
     payload = {
@@ -180,7 +185,7 @@ def dump_data_api(request):
 
 @require_GET
 def download_api(request, upload_id):
-    upload = get_object_or_404(Upload, pk=upload_id)
+    upload = get_object_or_404(Upload.objects.select_related("user"), pk=upload_id)
     return FileResponse(
         upload.file.open("rb"),
         as_attachment=True,
@@ -190,7 +195,7 @@ def download_api(request, upload_id):
 
 @require_GET
 def process_api(request, upload_id):
-    upload = get_object_or_404(Upload, pk=upload_id)
+    upload = get_object_or_404(Upload.objects.select_related("user"), pk=upload_id)
 
     try:
         extracted = extract_fields_from_file(upload.file.path)
@@ -215,9 +220,10 @@ def process_api(request, upload_id):
     return JsonResponse(payload, status=200)
 
 
-@api_login_required
 @require_GET
 def uploads_api_check(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Authentication required"}, status=401)
     return JsonResponse({"status": "authenticated", "user": request.user.username}, status=200)
 
 
