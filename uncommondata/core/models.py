@@ -8,20 +8,21 @@ from django.dispatch import receiver
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     is_curator = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.user.username} - {'Curator' if self.is_curator else 'Harvester'}"
+        role = "Curator" if self.is_curator else "Harvester"
+        return f"{self.user.username} - {role}"
 
 
 class Upload(models.Model):
     upload_id = models.CharField(max_length=64, db_index=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='uploads')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="uploads")
     institution = models.CharField(max_length=200)
     year = models.CharField(max_length=20)
     url = models.URLField(max_length=500, blank=True, null=True)
-    file = models.FileField(upload_to='uploads/%Y/%m/')
+    file = models.FileField(upload_to="uploads/%Y/%m/")
     original_filename = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
