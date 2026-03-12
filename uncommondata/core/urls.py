@@ -11,7 +11,8 @@ urlpatterns = [
     path('app/uploads/', views.uploads, name='uploads'),
     path('app/show-uploads/', views.show_uploads, name='show_uploads'),
     path('app/api/upload/', views.upload_api, name='upload_api'),
-
+    path('app/api/download/<str:upload_id>', views.download_api, name='download_api'),
+    path('app/api/process/<str:upload_id>', views.process_api, name='process_api'),
     path('app/api/uploads-check/', views.uploads_api_check, name='uploads_api_check'),
     path('app/api/uploads-status/', views.uploads_status, name='uploads_status'),
     path('app/api/dump-uploads/', views.dump_uploads_api, name='dump_uploads_api'),

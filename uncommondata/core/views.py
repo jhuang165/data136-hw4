@@ -8,7 +8,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
-
 from .decorators import api_login_required, curator_required
 from .extraction import EXPECTED_FIELDS, extract_fields_from_file
 from .models import Upload
@@ -249,4 +248,20 @@ def get_llm_joke(topic):
         return canned_jokes[topic_lower]
     if topic:
         return f"Knock knock.\nWho's there?\n{topic.capitalize()}.\n{topic.capitalize()} who?\n{topic.capitalize()} you please let me in? It's cold out here!"
+    return "Knock knock.\nWho's there?\nWho.\nWho who?\nAre you an owl?"
 
+
+
+def _get_upload_queryset_for_user(user):
+    qs = Upload.objects.select_related('user').order_by('-uploaded_at')
+    if user.profile.is_curator:
+        return qs
+    return qs.filter(user=user)
+
+
+
+def _get_accessible_upload_or_404(user, upload_id):
+    upload = get_object_or_404(Upload.objects.select_related('user'), pk=upload_id)
+    if user.profile.is_curator or upload.user == user:
+        return upload
+    raise Http404("Upload not found")
