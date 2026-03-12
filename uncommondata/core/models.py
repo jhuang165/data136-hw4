@@ -27,10 +27,10 @@ class Upload(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.original_filename} - {self.user.username} - {self.uploaded_at}"
+        return f"{self.original_filename} - {self.user.username}"
 
     @staticmethod
-    def hash_uploaded_file(uploaded_file) -> str:
+    def hash_uploaded_file(uploaded_file):
         digest = hashlib.sha256()
         for chunk in uploaded_file.chunks():
             digest.update(chunk)

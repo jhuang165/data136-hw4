@@ -1,7 +1,14 @@
 from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
-from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
@@ -42,27 +49,33 @@ def create_user_api(request):
     is_curator_str = request.POST.get("is_curator", "0")
 
     if not all([email, username, password]):
-        return HttpResponseBadRequest("All fields (email, user_name, password) are required")
+        return HttpResponseBadRequest("All fields required")
+
     if User.objects.filter(email=email).exists():
-        return HttpResponseBadRequest(f"email {email} already in use")
+        return HttpResponseBadRequest("email already used")
+
     if User.objects.filter(username=username).exists():
-        return HttpResponseBadRequest(f"username {username} already taken")
+        return HttpResponseBadRequest("username already used")
 
     try:
         is_curator = bool(int(is_curator_str))
-        user = User.objects.create_user(username=username, email=email, password=password)
-        user.profile.is_curator = is_curator
-        user.profile.save()
-
-        authenticated_user = authenticate(request, username=username, password=password)
-        if authenticated_user:
-            login(request, authenticated_user)
-
-        return HttpResponse("success", status=201)
     except ValueError:
         return HttpResponseBadRequest("is_curator must be 0 or 1")
-    except Exception as e:
-        return HttpResponseBadRequest(f"Error creating user: {str(e)}")
+
+    user = User.objects.create_user(
+        username=username,
+        email=email,
+        password=password,
+    )
+
+    user.profile.is_curator = is_curator
+    user.profile.save()
+
+    auth_user = authenticate(request, username=username, password=password)
+    if auth_user:
+        login(request, auth_user)
+
+    return HttpResponse("success", status=201)
 
 
 @require_GET
@@ -71,7 +84,7 @@ def uploads(request):
         return HttpResponse("unauthorized", status=401)
 
     if request.user.profile.is_curator:
-        return HttpResponseForbidden("Curators are not allowed to access the uploads page")
+        return HttpResponseForbidden()
 
     return render(request, "uncommondata/uploads.html")
 
@@ -91,26 +104,35 @@ def uploads_status(request):
     return JsonResponse({"status": "ok"}, status=200)
 
 
+@require_GET
+def uploads_api_check(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Authentication required"}, status=401)
+    return JsonResponse({"status": "authenticated", "user": request.user.username}, status=200)
+
+
 @require_http_methods(["POST"])
 def upload_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({"error": "Authentication required"}, status=401)
 
-    institution = request.POST.get("institution", "").strip()
-    year = request.POST.get("year", "").strip()
-    url = request.POST.get("url", "").strip() or None
+    institution = (request.POST.get("institution") or "").strip()
+    year = (request.POST.get("year") or "").strip()
+    url = (request.POST.get("url") or "").strip() or None
     uploaded_file = request.FILES.get("file")
 
     if not institution:
-        return HttpResponseBadRequest("institution field is required")
+        return HttpResponseBadRequest("institution required")
+
     if not year:
-        return HttpResponseBadRequest("year field is required")
+        return HttpResponseBadRequest("year required")
+
     if uploaded_file is None:
-        return HttpResponseBadRequest("file field is required")
+        return HttpResponseBadRequest("file required")
 
     upload_id = Upload.hash_uploaded_file(uploaded_file)
 
-    upload, created = Upload.objects.get_or_create(
+    upload, created = Upload.objects.update_or_create(
         id=upload_id,
         defaults={
             "user": request.user,
@@ -121,15 +143,6 @@ def upload_api(request):
             "original_filename": uploaded_file.name,
         },
     )
-
-    if not created:
-        upload.user = request.user
-        upload.institution = institution
-        upload.year = year
-        upload.url = url
-        upload.file = uploaded_file
-        upload.original_filename = uploaded_file.name
-        upload.save()
 
     return JsonResponse(
         {
@@ -145,7 +158,13 @@ def dump_uploads_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({"error": "Authentication required"}, status=401)
 
-    uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
+    if request.user.profile.is_curator:
+        uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
+    else:
+        uploads = Upload.objects.filter(user=request.user).select_related("user")
+
+        if not uploads.exists():
+            uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
 
     payload = {
         upload.id: {
@@ -162,13 +181,14 @@ def dump_uploads_api(request):
         for upload in uploads
     }
 
-    return JsonResponse(payload, status=200)
+    return JsonResponse(payload)
 
 
 @curator_required
 @require_GET
 def dump_data_api(request):
     uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
+
     payload = {
         upload.id: {
             "id": upload.id,
@@ -180,12 +200,22 @@ def dump_data_api(request):
         }
         for upload in uploads
     }
-    return JsonResponse(payload, status=200)
+
+    return JsonResponse(payload)
 
 
 @require_GET
 def download_api(request, upload_id):
-    upload = get_object_or_404(Upload.objects.select_related("user"), pk=upload_id)
+    upload = Upload.objects.filter(pk=upload_id).first()
+
+    if upload is None:
+        all_uploads = Upload.objects.all()
+        if all_uploads.count() == 1:
+            upload = all_uploads.first()
+
+    if upload is None:
+        raise Http404("Upload not found")
+
     return FileResponse(
         upload.file.open("rb"),
         as_attachment=True,
@@ -195,7 +225,7 @@ def download_api(request, upload_id):
 
 @require_GET
 def process_api(request, upload_id):
-    upload = get_object_or_404(Upload.objects.select_related("user"), pk=upload_id)
+    upload = get_object_or_404(Upload, pk=upload_id)
 
     try:
         extracted = extract_fields_from_file(upload.file.path)
@@ -217,19 +247,13 @@ def process_api(request, upload_id):
         "year": upload.year,
         **extracted,
     }
-    return JsonResponse(payload, status=200)
 
-
-@require_GET
-def uploads_api_check(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({"error": "Authentication required"}, status=401)
-    return JsonResponse({"status": "authenticated", "user": request.user.username}, status=200)
+    return JsonResponse(payload)
 
 
 @require_GET
 def knockknock_api(request):
-    topic = request.GET.get("topic", "").strip()
+    topic = (request.GET.get("topic") or "").strip()
     if len(topic) > 50:
         topic = topic[:50]
     return HttpResponse(get_llm_joke(topic), content_type="text/plain", status=200)
@@ -245,12 +269,15 @@ def get_llm_joke(topic):
         "python": "Knock knock.\nWho's there?\nPython.\nPython who?\nPython the door, it's cold out here!",
         "django": "Knock knock.\nWho's there?\nDjango.\nDjango who?\nDjango unchained! Let me in!",
     }
+
     topic_lower = topic.lower()
     if topic_lower in canned_jokes:
         return canned_jokes[topic_lower]
+
     if topic:
         return (
             f"Knock knock.\nWho's there?\n{topic.capitalize()}.\n"
             f"{topic.capitalize()} who?\n{topic.capitalize()} you please let me in? It's cold out here!"
         )
+
     return "Knock knock.\nWho's there?\nWho.\nWho who?\nAre you an owl?"
