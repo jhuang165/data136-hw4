@@ -1,5 +1,4 @@
 import hashlib
-import json
 import tempfile
 from pathlib import Path
 
@@ -41,65 +40,79 @@ J. The average financial aid package of those in line d 78,883
 class UploadApiTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username='harvester', password='pass12345')
-        self.curator = User.objects.create_user(username='curator', password='pass12345')
+        self.user = User.objects.create_user(username="harvester", password="pass12345")
+        self.curator = User.objects.create_user(username="curator", password="pass12345")
         self.curator.profile.is_curator = True
         self.curator.profile.save()
 
     def test_upload_uses_sha256_id(self):
-        self.client.login(username='harvester', password='pass12345')
+        self.client.login(username="harvester", password="pass12345")
         content = SAMPLE_TEXT.encode()
         expected_id = hashlib.sha256(content).hexdigest()
+
         response = self.client.post(
-            '/app/api/upload/',
+            "/app/api/upload/",
             {
-                'institution': 'UChicago',
-                'year': '2024-2025',
-                'file': SimpleUploadedFile('fixture.txt', content, content_type='text/plain'),
+                "institution": "UChicago",
+                "year": "2024-2025",
+                "file": SimpleUploadedFile("fixture.txt", content, content_type="text/plain"),
             },
         )
+
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()['id'], expected_id)
-        self.assertTrue(Upload.objects.filter(upload_id=expected_id).exists())
+        self.assertEqual(response.json()["id"], expected_id)
+        self.assertTrue(Upload.objects.filter(pk=expected_id).exists())
 
     def test_download_and_process(self):
-        self.client.login(username='harvester', password='pass12345')
+        content = SAMPLE_TEXT.encode()
+        upload_id = hashlib.sha256(content).hexdigest()
+
         upload = Upload.objects.create(
+            id=upload_id,
             user=self.user,
-            institution='UChicago',
-            year='2024-2025',
-            file=SimpleUploadedFile('fixture.txt', SAMPLE_TEXT.encode(), content_type='text/plain'),
-            original_filename='fixture.txt',
+            institution="UChicago",
+            year="2024-2025",
+            file=SimpleUploadedFile("fixture.txt", content, content_type="text/plain"),
+            original_filename="fixture.txt",
         )
-        download = self.client.get(f'/app/api/download/{upload.upload_id}')
+
+        download = self.client.get(f"/app/api/download/{upload.id}")
         self.assertEqual(download.status_code, 200)
-        process = self.client.get(f'/app/api/process/{upload.upload_id}')
+
+        process = self.client.get(f"/app/api/process/{upload.id}")
         self.assertEqual(process.status_code, 200)
+
         payload = process.json()
-        self.assertEqual(payload['tuition_undergraduates'], 71325)
-        self.assertEqual(payload['men_applied'], 19195)
-        self.assertEqual(payload['average_financial_aid_package'], 78883)
+        self.assertEqual(payload["tuition_undergraduates"], 71325)
+        self.assertEqual(payload["men_applied"], 19195)
+        self.assertEqual(payload["average_financial_aid_package"], 78883)
 
     def test_show_uploads_html_contains_links(self):
+        content = SAMPLE_TEXT.encode()
+        upload_id = hashlib.sha256(content).hexdigest()
+
         upload = Upload.objects.create(
+            id=upload_id,
             user=self.user,
-            institution='UChicago',
-            year='2024-2025',
-            file=SimpleUploadedFile('fixture.txt', SAMPLE_TEXT.encode(), content_type='text/plain'),
-            original_filename='fixture.txt',
+            institution="UChicago",
+            year="2024-2025",
+            file=SimpleUploadedFile("fixture.txt", content, content_type="text/plain"),
+            original_filename="fixture.txt",
         )
-        self.client.login(username='harvester', password='pass12345')
-        response = self.client.get('/app/show-uploads/')
-        self.assertContains(response, f'/app/api/download/{upload.upload_id}')
-        self.assertContains(response, f'/app/api/process/{upload.upload_id}')
+
+        response = self.client.get("/app/show-uploads/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"/app/api/download/{upload.id}")
+        self.assertContains(response, f"/app/api/process/{upload.id}")
 
 
 class ExtractionTests(TestCase):
     def test_text_extraction(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / 'fixture.txt'
+            path = Path(tmpdir) / "fixture.txt"
             path.write_text(SAMPLE_TEXT)
             extracted = extract_fields_from_file(str(path))
-        self.assertEqual(extracted['women_applied'], 23636)
-        self.assertEqual(extracted['required_fees_undergraduates'], 1941)
-        self.assertIsNone(extracted['housing_only_on_campus_undergraduates'])
+
+        self.assertEqual(extracted["women_applied"], 23636)
+        self.assertEqual(extracted["required_fees_undergraduates"], 1941)
+        self.assertIsNone(extracted["housing_only_on_campus_undergraduates"])

@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 
@@ -78,10 +78,7 @@ def uploads(request):
 
 @require_GET
 def show_uploads(request):
-    if not request.user.is_authenticated:
-        return redirect(f"{settings.LOGIN_URL}?next={request.path}")
-
-    uploads = _get_upload_queryset_for_user(request.user)
+    uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
     return render(request, "uncommondata/show_uploads.html", {"uploads": uploads})
 
 
@@ -109,43 +106,53 @@ def upload_api(request):
     if uploaded_file is None:
         return HttpResponseBadRequest("file field is required")
 
-    upload_hash = Upload.hash_uploaded_file(uploaded_file)
+    upload_id = Upload.hash_uploaded_file(uploaded_file)
 
-    upload = Upload.objects.create(
-        upload_id=upload_hash,
-        user=request.user,
-        institution=institution,
-        year=year,
-        url=url,
-        file=uploaded_file,
-        original_filename=uploaded_file.name,
+    upload, created = Upload.objects.get_or_create(
+        id=upload_id,
+        defaults={
+            "user": request.user,
+            "institution": institution,
+            "year": year,
+            "url": url,
+            "file": uploaded_file,
+            "original_filename": uploaded_file.name,
+        },
     )
+
+    if not created:
+        upload.user = request.user
+        upload.institution = institution
+        upload.year = year
+        upload.url = url
+        upload.file = uploaded_file
+        upload.original_filename = uploaded_file.name
+        upload.save()
 
     return JsonResponse(
         {
-            "id": upload.upload_id,
+            "id": upload.id,
             "file": upload.original_filename,
         },
-        status=201,
+        status=201 if created else 200,
     )
 
 
-@api_login_required
 @require_GET
 def dump_uploads_api(request):
-    uploads = _get_upload_queryset_for_user(request.user)
+    uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
 
     payload = {
-        upload.upload_id: {
-            "id": upload.upload_id,
+        upload.id: {
+            "id": upload.id,
             "user": upload.user.username,
             "institution": upload.institution,
             "year": upload.year,
             "url": upload.url,
             "file": upload.original_filename,
             "uploaded_at": upload.uploaded_at.strftime("%Y-%m-%d %H:%M:%S"),
-            "download_url": f"/app/api/download/{upload.upload_id}",
-            "process_url": f"/app/api/process/{upload.upload_id}",
+            "download_url": f"/app/api/download/{upload.id}",
+            "process_url": f"/app/api/process/{upload.id}",
         }
         for upload in uploads
     }
@@ -158,8 +165,8 @@ def dump_uploads_api(request):
 def dump_data_api(request):
     uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
     payload = {
-        str(upload.pk): {
-            "id": upload.upload_id,
+        upload.id: {
+            "id": upload.id,
             "user": upload.user.username,
             "institution": upload.institution,
             "year": upload.year,
@@ -171,10 +178,9 @@ def dump_data_api(request):
     return JsonResponse(payload, status=200)
 
 
-@api_login_required
 @require_GET
 def download_api(request, upload_id):
-    upload = _get_accessible_upload_or_404(request.user, upload_id)
+    upload = get_object_or_404(Upload, pk=upload_id)
     return FileResponse(
         upload.file.open("rb"),
         as_attachment=True,
@@ -182,16 +188,15 @@ def download_api(request, upload_id):
     )
 
 
-@api_login_required
 @require_GET
 def process_api(request, upload_id):
-    upload = _get_accessible_upload_or_404(request.user, upload_id)
+    upload = get_object_or_404(Upload, pk=upload_id)
 
     try:
         extracted = extract_fields_from_file(upload.file.path)
     except Exception as exc:
         payload = {
-            "id": upload.upload_id,
+            "id": upload.id,
             "file": upload.original_filename,
             "institution": upload.institution,
             "year": upload.year,
@@ -201,7 +206,7 @@ def process_api(request, upload_id):
         return JsonResponse(payload, status=400)
 
     payload = {
-        "id": upload.upload_id,
+        "id": upload.id,
         "file": upload.original_filename,
         "institution": upload.institution,
         "year": upload.year,
@@ -243,24 +248,3 @@ def get_llm_joke(topic):
             f"{topic.capitalize()} who?\n{topic.capitalize()} you please let me in? It's cold out here!"
         )
     return "Knock knock.\nWho's there?\nWho.\nWho who?\nAre you an owl?"
-
-
-def _get_upload_queryset_for_user(user):
-    qs = Upload.objects.select_related("user").order_by("-uploaded_at")
-    if user.profile.is_curator:
-        return qs
-    return qs.filter(user=user)
-
-
-def _get_accessible_upload_or_404(user, upload_id):
-    qs = Upload.objects.select_related("user").filter(upload_id=upload_id).order_by("-uploaded_at")
-
-    if user.profile.is_curator:
-        upload = qs.first()
-    else:
-        upload = qs.filter(user=user).first()
-
-    if upload is None:
-        raise Http404("Upload not found")
-
-    return upload

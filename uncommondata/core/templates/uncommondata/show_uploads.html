@@ -28,15 +28,15 @@
         <tbody>
             {% for upload in uploads %}
             <tr>
-                <td>{{ upload.upload.id }}</td>
+                <td>{{ upload.id }}</td>
                 <td>{{ upload.user.username }}</td>
                 <td>{{ upload.institution }}</td>
                 <td>{{ upload.year }}</td>
                 <td>{{ upload.original_filename }}</td>
                 <td>{{ upload.uploaded_at }}</td>
                 <td>
-                    <a href="/app/api/download/{{ upload.upload_id }}">download</a>
-                    <a href="/app/api/process/{{ upload.upload_id }}">process</a>
+                    <a href="/app/api/download/{{ upload.id }}">download</a>
+                    <a href="/app/api/process/{{ upload.id }}">process</a>
                 </td>
             </tr>
             {% endfor %}
