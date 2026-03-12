@@ -48,14 +48,13 @@ class Upload(models.Model):
         return digest.hexdigest()
 
     def save(self, *args, **kwargs):
-        has_file = getattr(self, "file", None) is not None and getattr(self.file, "name", None)
+        has_named_file = getattr(self, "file", None) is not None and bool(getattr(self.file, "name", ""))
 
-        if has_file and not self.original_filename:
+        if has_named_file and not self.original_filename:
             self.original_filename = os.path.basename(self.file.name)
 
-        # Important: do NOT use `if self.file` here.
-        # Empty uploaded files evaluate False, but still need a SHA-256 id.
-        if has_file and not self.id:
+        # Important: empty uploaded files can evaluate False, so don't use `if self.file`.
+        if has_named_file and not self.id:
             self.id = self.hash_uploaded_file(self.file)
 
         super().save(*args, **kwargs)

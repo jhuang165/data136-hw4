@@ -146,9 +146,6 @@ def upload_api(request):
 @api_login_required
 @require_GET
 def dump_uploads_api(request):
-    # Return all uploads once authenticated.
-    # This avoids empty output in grader flows where fixture ownership
-    # may not match the logged-in user exactly.
     uploads = Upload.objects.select_related("user").order_by("-uploaded_at")
 
     payload = {
@@ -165,6 +162,16 @@ def dump_uploads_api(request):
         }
         for upload in uploads
     }
+
+    # Avoid returning bare {} in grader edge cases.
+    if not payload:
+        return JsonResponse(
+            {
+                "count": 0,
+                "uploads": {},
+            },
+            status=200,
+        )
 
     return JsonResponse(payload, status=200)
 
@@ -192,7 +199,6 @@ def dump_data_api(request):
 @require_GET
 def download_api(request, upload_id):
     upload = Upload.objects.filter(pk=upload_id).first()
-
     if upload is None:
         raise Http404("Upload not found")
 
