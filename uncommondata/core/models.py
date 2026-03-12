@@ -53,7 +53,6 @@ class Upload(models.Model):
         if has_named_file and not self.original_filename:
             self.original_filename = os.path.basename(self.file.name)
 
-        # Important: empty uploaded files can evaluate False, so don't use `if self.file`.
         if has_named_file and not self.id:
             self.id = self.hash_uploaded_file(self.file)
 
