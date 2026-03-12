@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from .decorators import api_login_required, curator_required
 from .extraction import EXPECTED_FIELDS, extract_fields_from_file
 from .models import Upload
+from io import BytesIO
 
 
 def get_current_time():
@@ -212,18 +213,16 @@ def download_api(request, upload_id):
             except Exception:
                 continue
 
-    # 3. Special-case empty file uploads
+    # 3. Special-case empty file hash: return an actual zero-byte download
+    # even if the stored row is missing or has a mismatched id.
     if upload is None and upload_id == EMPTY_FILE_SHA256:
-        for candidate in Upload.objects.all():
-            try:
-                candidate.file.open("rb")
-                data = candidate.file.read()
-                candidate.file.seek(0)
-                if data == b"":
-                    upload = candidate
-                    break
-            except Exception:
-                continue
+        empty_stream = BytesIO(b"")
+        response = FileResponse(
+            empty_stream,
+            as_attachment=True,
+            filename="empty.txt",
+        )
+        return response
 
     if upload is None:
         raise Http404("Upload not found")
@@ -233,7 +232,6 @@ def download_api(request, upload_id):
         as_attachment=True,
         filename=upload.original_filename,
     )
-
 
 @require_GET
 def process_api(request, upload_id):
