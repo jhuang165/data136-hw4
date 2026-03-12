@@ -1,8 +1,6 @@
-import os
 from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -11,7 +9,6 @@ from django.views.decorators.http import require_GET, require_http_methods
 from .decorators import api_login_required, curator_required
 from .extraction import EXPECTED_FIELDS, extract_fields_from_file
 from .models import Upload
-
 
 
 def get_current_time():
@@ -68,18 +65,10 @@ def create_user_api(request):
 
 @require_GET
 def uploads(request):
-    user_agent = request.META.get('HTTP_USER_AGENT', '')
-    accept_header = request.META.get('HTTP_ACCEPT', '')
-    is_test_request = 'python-requests' in user_agent or 'pytest' in user_agent or 'application/json' in accept_header
-
     if not request.user.is_authenticated:
-        if is_test_request:
-            return JsonResponse({"error": "Authentication required", "status": 401}, status=401)
         return redirect(f"{settings.LOGIN_URL}?next={request.path}")
 
     if request.user.profile.is_curator:
-        if is_test_request:
-            return JsonResponse({"error": "Curators cannot access this page", "status": 403}, status=403)
         return HttpResponseForbidden("Curators are not allowed to access the uploads page")
 
     return render(request, 'uncommondata/uploads.html')
@@ -92,15 +81,6 @@ def show_uploads(request):
 
     uploads = _get_upload_queryset_for_user(request.user)
     return render(request, 'uncommondata/show_uploads.html', {'uploads': uploads})
-
-
-@require_GET
-def uploads_status(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({"status": "unauthorized"}, status=401)
-    if request.user.profile.is_curator:
-        return JsonResponse({"status": "forbidden"}, status=403)
-    return JsonResponse({"status": "ok"}, status=200)
 
 
 @api_login_required
@@ -118,33 +98,25 @@ def upload_api(request):
     if not uploaded_file:
         return HttpResponseBadRequest("file field is required")
 
-    upload_id = Upload.hash_uploaded_file(uploaded_file)
-    upload, created = Upload.objects.get_or_create(
-        id=upload_id,
-        defaults={
-            'user': request.user,
-            'institution': institution,
-            'year': year,
-            'url': url,
-            'file': uploaded_file,
-            'original_filename': uploaded_file.name,
-        },
+    upload_hash = Upload.hash_uploaded_file(uploaded_file)
+
+    upload = Upload.objects.create(
+        upload_id=upload_hash,
+        user=request.user,
+        institution=institution,
+        year=year,
+        url=url,
+        file=uploaded_file,
+        original_filename=uploaded_file.name,
     )
 
-    if not created:
-        if request.user.profile.is_curator or upload.user == request.user:
-            upload.institution = institution
-            upload.year = year
-            upload.url = url
-            if uploaded_file:
-                upload.file = uploaded_file
-                upload.original_filename = uploaded_file.name
-            upload.save()
-        else:
-            return HttpResponseForbidden("A file with identical contents already exists for another user")
-
-    payload = {"id": upload.id, "created": created, "file": upload.original_filename}
-    return JsonResponse(payload, status=201 if created else 200)
+    return JsonResponse(
+        {
+            "id": upload.upload_id,
+            "file": upload.original_filename,
+        },
+        status=201,
+    )
 
 
 @api_login_required
@@ -152,16 +124,16 @@ def upload_api(request):
 def dump_uploads_api(request):
     uploads = _get_upload_queryset_for_user(request.user)
     payload = {
-        upload.id: {
-            'id': upload.id,
+        str(upload.pk): {
+            'id': upload.upload_id,
             'user': upload.user.username,
             'institution': upload.institution,
             'year': upload.year,
             'url': upload.url,
             'file': upload.original_filename,
             'uploaded_at': upload.uploaded_at.strftime("%Y-%m-%d %H:%M:%S"),
-            'download_url': f'/app/api/download/{upload.id}',
-            'process_url': f'/app/api/process/{upload.id}',
+            'download_url': f'/app/api/download/{upload.upload_id}',
+            'process_url': f'/app/api/process/{upload.upload_id}',
         }
         for upload in uploads
     }
@@ -173,7 +145,8 @@ def dump_uploads_api(request):
 def dump_data_api(request):
     uploads = Upload.objects.select_related('user').order_by('-uploaded_at')
     payload = {
-        upload.id: {
+        str(upload.pk): {
+            'id': upload.upload_id,
             'user': upload.user.username,
             'institution': upload.institution,
             'year': upload.year,
@@ -189,33 +162,43 @@ def dump_data_api(request):
 @require_GET
 def download_api(request, upload_id):
     upload = _get_accessible_upload_or_404(request.user, upload_id)
+
     if not upload.file:
         raise Http404("Uploaded file is missing")
-    response = FileResponse(upload.file.open('rb'), as_attachment=True, filename=upload.original_filename)
-    return response
+
+    return FileResponse(
+        upload.file.open('rb'),
+        as_attachment=True,
+        filename=upload.original_filename,
+    )
 
 
 @api_login_required
 @require_GET
 def process_api(request, upload_id):
     upload = _get_accessible_upload_or_404(request.user, upload_id)
+
     try:
         extracted = extract_fields_from_file(upload.file.path)
     except Exception as exc:
-        return JsonResponse({
-            'id': upload.id,
+        payload = {
+            'id': upload.upload_id,
             'file': upload.original_filename,
+            'institution': upload.institution,
+            'year': upload.year,
+            **dict(EXPECTED_FIELDS),
             'error': str(exc),
-            'extracted': dict(EXPECTED_FIELDS),
-        }, status=400)
+        }
+        return JsonResponse(payload, status=400)
 
-    return JsonResponse({
-        'id': upload.id,
+    payload = {
+        'id': upload.upload_id,
         'file': upload.original_filename,
         'institution': upload.institution,
         'year': upload.year,
-        'extracted': extracted,
-    })
+        **extracted,
+    }
+    return JsonResponse(payload, status=200)
 
 
 @api_login_required
@@ -225,12 +208,20 @@ def uploads_api_check(request):
 
 
 @require_GET
+def uploads_status(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"status": "unauthorized"}, status=401)
+    if request.user.profile.is_curator:
+        return JsonResponse({"status": "forbidden"}, status=403)
+    return JsonResponse({"status": "ok"}, status=200)
+
+
+@require_GET
 def knockknock_api(request):
     topic = request.GET.get('topic', '').strip()
     if len(topic) > 50:
         topic = topic[:50]
     return HttpResponse(get_llm_joke(topic), content_type='text/plain', status=200)
-
 
 
 def get_llm_joke(topic):
@@ -251,7 +242,6 @@ def get_llm_joke(topic):
     return "Knock knock.\nWho's there?\nWho.\nWho who?\nAre you an owl?"
 
 
-
 def _get_upload_queryset_for_user(user):
     qs = Upload.objects.select_related('user').order_by('-uploaded_at')
     if user.profile.is_curator:
@@ -259,9 +249,15 @@ def _get_upload_queryset_for_user(user):
     return qs.filter(user=user)
 
 
-
 def _get_accessible_upload_or_404(user, upload_id):
-    upload = get_object_or_404(Upload.objects.select_related('user'), pk=upload_id)
-    if user.profile.is_curator or upload.user == user:
-        return upload
-    raise Http404("Upload not found")
+    qs = Upload.objects.select_related('user').filter(upload_id=upload_id).order_by('-uploaded_at')
+
+    if user.profile.is_curator:
+        upload = qs.first()
+    else:
+        upload = qs.filter(user=user).first()
+
+    if upload is None:
+        raise Http404("Upload not found")
+
+    return upload

@@ -60,7 +60,7 @@ class UploadApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()['id'], expected_id)
-        self.assertTrue(Upload.objects.filter(pk=expected_id).exists())
+        self.assertTrue(Upload.objects.filter(upload_id=expected_id).exists())
 
     def test_download_and_process(self):
         self.client.login(username='harvester', password='pass12345')
@@ -71,14 +71,14 @@ class UploadApiTests(TestCase):
             file=SimpleUploadedFile('fixture.txt', SAMPLE_TEXT.encode(), content_type='text/plain'),
             original_filename='fixture.txt',
         )
-        download = self.client.get(f'/app/api/download/{upload.id}')
+        download = self.client.get(f'/app/api/download/{upload.upload_id}')
         self.assertEqual(download.status_code, 200)
-        process = self.client.get(f'/app/api/process/{upload.id}')
+        process = self.client.get(f'/app/api/process/{upload.upload_id}')
         self.assertEqual(process.status_code, 200)
-        extracted = process.json()['extracted']
-        self.assertEqual(extracted['tuition_undergraduates'], 71325)
-        self.assertEqual(extracted['men_applied'], 19195)
-        self.assertEqual(extracted['average_financial_aid_package'], 78883)
+        payload = process.json()
+        self.assertEqual(payload['tuition_undergraduates'], 71325)
+        self.assertEqual(payload['men_applied'], 19195)
+        self.assertEqual(payload['average_financial_aid_package'], 78883)
 
     def test_show_uploads_html_contains_links(self):
         upload = Upload.objects.create(
@@ -90,8 +90,8 @@ class UploadApiTests(TestCase):
         )
         self.client.login(username='harvester', password='pass12345')
         response = self.client.get('/app/show-uploads/')
-        self.assertContains(response, f'/app/api/download/{upload.id}')
-        self.assertContains(response, f'/app/api/process/{upload.id}')
+        self.assertContains(response, f'/app/api/download/{upload.upload_id}')
+        self.assertContains(response, f'/app/api/process/{upload.upload_id}')
 
 
 class ExtractionTests(TestCase):

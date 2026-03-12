@@ -1,0 +1,24 @@
+
+C1:
+Total first-time, first-year men who applied 19,195
+Total first-time, first-year women who applied 23,636
+Total first-time, first-year another gender who applied 0
+Total first-time, first-year unknown gender who applied 781
+Total first-time, first-year men who were admitted 1,070
+Total first-time, first-year women who were admitted 885
+Total first-time, first-year another gender who were admitted 0
+Total first-time, first-year unknown gender who were admitted 0
+
+G1:
+Tuition (Undergraduates) 71,325
+Required Fees: (Undergraduates) 1,941
+Food and housing (on-campus): (Undergraduates) 20,835
+Housing Only (on-campus): (Undergraduates) --
+Food Only (on-campus meal plan): (Undergraduates) --
+
+H2:
+A. Number of degree-seeking undergraduate students 7,497
+B. Number of students in line a who applied for need-based financial aid 2,953
+C. Number of students in line b who were determined to have financial need 2,589
+D. Number of students in line c who were awarded any financial aid 2,579
+J. The average financial aid package of those in line d 78,883

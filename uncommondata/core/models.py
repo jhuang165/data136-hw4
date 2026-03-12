@@ -1,6 +1,5 @@
 import hashlib
 import os
-from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -17,7 +16,7 @@ class UserProfile(models.Model):
 
 
 class Upload(models.Model):
-    id = models.CharField(max_length=64, primary_key=True, editable=False)
+    upload_id = models.CharField(max_length=64, db_index=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='uploads')
     institution = models.CharField(max_length=200)
     year = models.CharField(max_length=20)
@@ -41,8 +40,8 @@ class Upload(models.Model):
         if self.file and not self.original_filename:
             self.original_filename = os.path.basename(self.file.name)
 
-        if self.file and not self.id:
-            self.id = self.hash_uploaded_file(self.file)
+        if self.file and not self.upload_id:
+            self.upload_id = self.hash_uploaded_file(self.file)
 
         super().save(*args, **kwargs)
 
