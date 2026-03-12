@@ -23,25 +23,39 @@ class Upload(models.Model):
     year = models.CharField(max_length=20)
     url = models.URLField(max_length=500, blank=True, null=True)
     file = models.FileField(upload_to="uploads/%Y/%m/")
-    original_filename = models.CharField(max_length=255)
+    original_filename = models.CharField(max_length=255, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.original_filename} - {self.user.username}"
 
     @staticmethod
-    def hash_uploaded_file(uploaded_file):
+    def hash_uploaded_file(uploaded_file) -> str:
         digest = hashlib.sha256()
-        for chunk in uploaded_file.chunks():
-            digest.update(chunk)
-        uploaded_file.seek(0)
+
+        if hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0)
+
+        if hasattr(uploaded_file, "chunks"):
+            for chunk in uploaded_file.chunks():
+                digest.update(chunk)
+        else:
+            digest.update(uploaded_file.read())
+
+        if hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0)
+
         return digest.hexdigest()
 
     def save(self, *args, **kwargs):
-        if self.file and not self.original_filename:
+        has_file = getattr(self, "file", None) is not None and getattr(self.file, "name", None)
+
+        if has_file and not self.original_filename:
             self.original_filename = os.path.basename(self.file.name)
 
-        if self.file and not self.id:
+        # Important: do NOT use `if self.file` here.
+        # Empty uploaded files evaluate False, but still need a SHA-256 id.
+        if has_file and not self.id:
             self.id = self.hash_uploaded_file(self.file)
 
         super().save(*args, **kwargs)
