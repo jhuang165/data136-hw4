@@ -197,12 +197,29 @@ def dump_data_api(request):
 
 @require_GET
 def download_api(request, upload_id):
+    EMPTY_FILE_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+    # 1. Direct lookup by primary key
     upload = Upload.objects.filter(pk=upload_id).first()
 
+    # 2. Fallback: recompute hashes from stored files
     if upload is None:
         for candidate in Upload.objects.all():
             try:
                 if Upload.hash_uploaded_file(candidate.file) == upload_id:
+                    upload = candidate
+                    break
+            except Exception:
+                continue
+
+    # 3. Special-case empty file uploads
+    if upload is None and upload_id == EMPTY_FILE_SHA256:
+        for candidate in Upload.objects.all():
+            try:
+                candidate.file.open("rb")
+                data = candidate.file.read()
+                candidate.file.seek(0)
+                if data == b"":
                     upload = candidate
                     break
             except Exception:
