@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Show Uploads</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 0.6rem; text-align: left; }
+        th { background: #f4f4f4; }
+        a { margin-right: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Uploaded Files</h1>
+    {% if uploads %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Institution</th>
+                <th>Year</th>
+                <th>File</th>
+                <th>Uploaded</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for upload in uploads %}
+            <tr>
+                <td>{{ upload.id }}</td>
+                <td>{{ upload.user.username }}</td>
+                <td>{{ upload.institution }}</td>
+                <td>{{ upload.year }}</td>
+                <td>{{ upload.original_filename }}</td>
+                <td>{{ upload.uploaded_at }}</td>
+                <td>
+                    <a href="/app/api/download/{{ upload.id }}">download</a>
+                    <a href="/app/api/process/{{ upload.id }}">process</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No uploads yet.</p>
+    {% endif %}
+</body>
+</html>
